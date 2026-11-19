@@ -1,0 +1,1101 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Job Module Inline Edit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="ds/tokens.css">
+<link rel="stylesheet" href="ds/bundle.css">
+<style>
+/* Layout: navy global nav and page header, then a two-column work area (job card with the inline-edit
+   product table | 467px side panel), then a fixed action footer.
+   Every colour, type style, spacing step and radius comes from the BlindMatrix tokens in ds/tokens.css.
+   The design system ships a light theme only, so this page commits to light. */
+:root { color-scheme: light; --side-w: clamp(340px, 28vw, 467px); --scrim: rgba(0, 0, 0, .55); /* no token: modal scrim */ }
+html, body { height: 100%; }
+body { margin: 0; background: var(--body-bg); color: var(--content-text); font: var(--text-Web-Body-3); -webkit-font-smoothing: antialiased; }
+#root { height: 100%; }
+button { font-family: var(--font-sans); }
+
+/* ---------- app frame ---------- */
+.app { display: flex; flex-direction: column; min-height: 100%; }
+.app > .bm-gnav { flex: none; position: relative; z-index: 5; }
+.bm-gnav__bar, .bm-gnav__page { padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+.work { flex: 1 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--spacing-5);
+  padding-block: 13px var(--spacing-5); padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+.job-card { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--white-bg); border-radius: var(--radius-md); box-shadow: var(--elevation-sm); }
+.job-card__table { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 var(--spacing-5); }
+.side { position: relative; min-width: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); align-items: start; gap: var(--spacing-5); }
+.page-foot { position: sticky; bottom: 0; z-index: 6; flex: none; display: flex; justify-content: flex-end; align-items: center; gap: var(--spacing-5); min-height: 60px; box-sizing: border-box;
+  background: var(--white-bg); border-top: 1px solid var(--field-border); padding-block: 10px;
+  padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+
+/* Button extension: the DS Button has no success variant; the Figma inline Save uses the `success` token. */
+.bm-btn.bm-btn--success { background: var(--success); color: var(--button-text); }
+.bm-btn.bm-btn--success:hover, .bm-btn.bm-btn--success:active { background: var(--green-700); box-shadow: var(--elevation-sm); }
+
+/* ---------- job header ---------- */
+.jh-wrap { position: relative; display: flex; flex-direction: column; align-items: center; }
+.jh { align-self: stretch; background: var(--primary); border-radius: var(--radius-md) var(--radius-md) 0 0; padding: var(--spacing-3) var(--spacing-5); color: var(--white); }
+.jh__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--spacing-3) var(--spacing-10); }
+.jh__col { display: flex; flex-direction: column; gap: var(--spacing-3); min-width: 0; }
+.jh__title { margin: 0; min-height: 44px; display: flex; align-items: center; font: var(--text-Web-Heading-3); color: var(--white); text-wrap: balance; }
+.jh .bm-field__label { color: var(--white); font: var(--text-Web-Heading-5); }
+.jh .bm-field--inline .bm-field__label { flex: 0 0 118px; }
+.jh .bm-field--inline .bm-field__col { flex: 1; width: auto; min-width: 0; }
+.jh-ref__div { flex: none; width: 1px; align-self: stretch; margin: 8px 0; background: var(--field-border); }
+.jh-ref__ver { flex: 0 0 56px; appearance: none; -webkit-appearance: none; cursor: pointer; }
+.jh-ref .bm-chevron { color: var(--neutral-500); }
+.jh__contact { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--spacing-3) var(--spacing-10); margin: var(--spacing-4) 0 var(--spacing-1); padding-top: var(--spacing-3); border-top: 1px solid var(--blue-200); }
+.jh__contact dt { font: var(--text-Web-Caption-1); color: var(--white); }
+.jh__contact dd { margin: 0; font: var(--text-Web-Heading-5); color: var(--white); overflow-wrap: anywhere; }
+.jh-contact.bm-btn { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 2; height: 30px; padding: 0 var(--spacing-3);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm); font: var(--text-Web-Heading-5); gap: var(--spacing-2); }
+.jh-contact__icon { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--white); transition: transform .15s; }
+.jh-contact .jh-contact__icon .bm-icon { color: var(--primary); }
+.jh-contact__icon.is-open { transform: rotate(180deg); }
+/* Header fields sit on the cyan band: no fill, white stroke, white text. */
+.jh .bm-field__box { background: transparent; border-color: var(--white); }
+.jh .bm-field__box:focus-within { border-color: var(--white); box-shadow: inset 0 0 0 1px var(--white); }
+.jh .bm-field__input, .jh .bm-field__box .bm-chevron { color: var(--white); }
+.jh .bm-field__input::placeholder { color: var(--blue-100); }
+.jh select option { color: var(--content-text); background: var(--white-bg); }
+.jh .jh-ref__div { background: var(--white); }
+
+/* ---------- toolbar ---------- */
+.toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--spacing-3) var(--spacing-5); padding: var(--spacing-5); }
+.toolbar__group { display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-5); }
+.menu-anchor { position: relative; }
+.menu-pop { position: absolute; top: calc(100% + 6px); z-index: 40; }
+.menu-pop--left { left: 0; }
+.menu-pop--right { right: 0; }
+.menu-fixed { position: fixed; z-index: 60; }
+.bm-options__item .bm-check { pointer-events: none; }
+.bm-options__item:focus-visible { outline: 2px solid var(--info); outline-offset: -2px; }
+.asset-icon { display: block; flex: none; }
+.rot90 { display: grid; transform: rotate(90deg); }
+
+/* ---------- product table (shared by the page and the Job Products modal) ---------- */
+.pt { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.pt-scroll { position: relative; flex: 1; min-height: 0; overflow: auto;border-radius: var(--radius-sm) var(--radius-sm) 0 0; overscroll-behavior: contain; }
+.pt-head, .pt-filter, .pt-row, .pt-total { display: grid; align-items: center; }
+.pt-head { position: sticky; top: 0; z-index: 4; height: 52px; background: var(--blue-400); color: var(--white); font: var(--text-Web-Heading-5); }
+.pt-filter { position: sticky; top: 52px; z-index: 4; height: 52px; background: var(--blue-table-bg); border-bottom: 1px solid var(--field-border); }
+.pt-c { min-width: 0; padding: 0 var(--spacing-5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pt-c--center { display: flex; justify-content: center; padding: 0; overflow: visible; }
+.pt-c--end { display: flex; justify-content: flex-end; padding: 0 var(--spacing-3) 0 0; overflow: visible; }
+.pt-filter .pt-c { overflow: visible; }
+.pt-row { min-height: 52px; background: var(--white-bg); border-bottom: 1px solid var(--field-border); font: var(--text-Web-Body-3); color: var(--content-text); }
+.pt-row .pt-c.is-money { font: var(--text-Web-Body-2); font-variant-numeric: tabular-nums; }
+.pt-row.is-selected { background: var(--blue-table-bg); }
+.pt-item.is-new > .pt-row { animation: row-new 2.4s ease-out; }
+@keyframes row-new { 0%, 40% { background: var(--blue-100); } 100% { background: var(--white-bg); } }
+.pt-item.is-dragging { opacity: .5; }
+.pt-item.is-drop > .pt-row { box-shadow: inset 0 2px 0 var(--primary); }
+.pt-grip { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-sm); cursor: grab; }
+.pt-grip:active { cursor: grabbing; }
+.hdr-btn { width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-xs); background: var(--white); cursor: pointer; }
+.hdr-btn .bm-icon { color: var(--secondary); }
+.hdr-btn:focus-visible, .pt-searchbtn:focus-visible, .subtabs__arrow:focus-visible, .pt-grip:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+.hdr-btn--static { display: inline-grid; cursor: default; vertical-align: middle; }
+.hdr-btn__arrow { display: grid; transform: rotate(90deg); transition: transform .15s; }
+.hdr-btn__arrow.is-down { transform: rotate(-90deg); }
+.pt-searchbtn { width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 1px solid var(--neutral-300); border-radius: 50%; background: transparent; cursor: pointer; }
+.pt-searchbtn .bm-icon { color: var(--neutral-400); }
+.pt-searchbtn:hover { background: var(--white-bg); }
+.pt-search { width: 100%; height: 32px; box-sizing: border-box; padding: 0 var(--spacing-3); border: 1px solid var(--field-border); border-radius: var(--radius-round);
+  background: var(--field-bg); font: var(--text-Web-Body-3); color: var(--content-text); outline: 0; }
+.pt-search:focus { border-color: var(--primary-border-active); }
+.pt-search::placeholder { color: var(--placeholder-text); }
+.pt-empty { background: var(--white-bg); }
+.pt--page .pt-scroll { max-height: max(420px, 72vh); }
+/* The edit panel keeps to the visible width while the row header scrolls sideways. */
+.pf, .pt-empty { position: sticky; left: 0; }
+
+/* expanded product: inline-edit fields */
+.pf { background: var(--body-bg); }
+.pf-panel { display: flex; align-items: flex-start; gap: var(--spacing-3); padding: var(--spacing-3); }
+.pf-grid { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)); gap: var(--spacing-3); align-items: start; }
+.pf-grid .bm-field__label { font: var(--text-Mobile-Label-Medium); }
+.pf-media { flex: none; display: flex; gap: var(--spacing-3); }
+.pf-thumb { position: relative; display: block; width: 46px; height: 46px; }
+.pf-thumb__back { position: absolute; width: 34px; height: 34px; border-radius: 1px; background: var(--neutral-250); }
+.pf-thumb__back--a { left: 10px; top: 7px; transform: rotate(5deg); }
+.pf-thumb__back--b { left: 3px; top: 5px; transform: rotate(-10deg); }
+.pf-thumb__img { position: absolute; left: 6px; top: 6px; width: 34px; height: 34px; box-sizing: border-box; object-fit: cover; border: 1px solid var(--white); border-radius: 1px; background: var(--neutral-300); }
+.pf-thumb__count { position: absolute; left: 25px; top: 25px; width: 15px; height: 15px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--neutral-150); color: var(--secondary); font: 700 8px/1 var(--font-sans); }
+.pf-qr { display: block; width: 46px; height: 46px; }
+.pf-error { display: flex; align-items: center; gap: 6px; padding: 0 var(--spacing-3) var(--spacing-3); font: var(--text-Web-Caption-1); color: var(--error-text); }
+.pf-error .bm-icon { color: var(--error); }
+.pf-actions { display: flex; gap: var(--spacing-5); padding: var(--spacing-5) var(--spacing-3); border-top: 1.5px solid var(--field-border); }
+.field-unit { flex: none; padding-right: var(--spacing-1); font: var(--text-Web-Body-3); color: var(--content-text); }
+.sel-box { position: relative; }
+.sel-box select { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; padding: 0 36px 0 var(--spacing-3); appearance: none; -webkit-appearance: none; background: transparent; cursor: pointer; }
+.sel-box.is-mandatory select { padding-left: var(--spacing-4); }
+.sel-box .bm-chevron, .picker-box .bm-chevron { position: absolute; right: 10px; top: 50%; margin-top: -8px; color: var(--neutral-500); pointer-events: none; }
+.picker-box { width: 100%; font: inherit; text-align: left; cursor: pointer; }
+.picker-box__value { display: block; padding-right: 28px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* total bar */
+.pt-total { position: sticky; bottom: 0; z-index: 3; min-height: 64px; background: var(--white-bg); border-top: 1px solid var(--field-border); }
+.pt-total .pt-c { overflow: visible; }
+.pt-total__label { grid-column: span 2; padding-left: var(--spacing-2); font: var(--text-Web-Heading-4); color: var(--heading-text); }
+.total-box { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 40px; box-sizing: border-box; padding: 0 10px;
+  border-radius: var(--radius-sm); background: var(--body-bg); font: var(--text-Web-Body-2); font-variant-numeric: tabular-nums; color: var(--content-text); }
+
+/* ---------- popovers: add product ---------- */
+.pm { position: absolute; left: 0; z-index: 45; display: flex; align-items: flex-start; gap: var(--spacing-2); }
+.pm--down { top: calc(100% + 6px); }
+.pm--up { bottom: calc(100% + 6px); align-items: flex-end; }
+.pm--end { left: auto; right: 0; flex-direction: row-reverse; }
+.pm-pop { width: 337px; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--spacing-1); padding: var(--spacing-2) 0;
+  background: var(--white-bg); border-radius: var(--radius-md); box-shadow: var(--elevation-md); }
+.pm-pop--sub { width: 315px; }
+.pm-search { padding: 0 var(--spacing-2) var(--spacing-1); }
+.pm-list.bm-options { width: auto; padding: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.pm-list .bm-options__list { max-height: 320px; }
+.pm-list--groups .bm-options__item::after { content: ""; margin-left: auto; border-left: 6px solid var(--neutral-500); border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+.pm-emptystate.bm-empty, .side-empty.bm-empty { padding: var(--spacing-5); }
+.pm-emptystate .bm-empty__art svg, .side-empty .bm-empty__art svg, .pt-empty .bm-empty__art svg { width: 120px; }
+
+/* ---------- overlays ---------- */
+.scrim { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 16px; background: var(--scrim); }
+.scrim--modal { top: 56px; }
+.scrim--top { z-index: 70; }
+.jp.bm-modal { position: fixed; top: 51px; bottom: 51px; left: 55px; right: 55px; width: auto; max-width: none; }
+.jp:focus { outline: none; }
+.jp__body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: var(--spacing-5) var(--spacing-5) 0; }
+.jp__foot { flex: none; justify-content: flex-end; }
+.jp__end { display: flex; gap: var(--spacing-5); }
+.opt-modal.bm-modal { width: 725px; }
+.opt-body { padding: var(--spacing-5) var(--spacing-5) var(--spacing-3); }
+.opt-table { max-height: 320px; border: 1px solid var(--field-border); border-radius: var(--radius-sm); }
+.opt-table thead th { position: sticky; top: 0; z-index: 1; }
+.opt-table th.opt-qty { width: 120px; }
+.opt-table tbody tr { cursor: pointer; }
+.opt-table tbody tr:hover td { background: var(--blue-table-bg); }
+.opt-table tbody tr:focus-visible { outline: 2px solid var(--info); outline-offset: -2px; }
+.opt-table tbody tr:last-child td { border-bottom: 0; }
+.opt-foot { justify-content: flex-end; }
+.toasts { position: fixed; top: 64px; right: max(20px, env(safe-area-inset-right, 0px)); z-index: 100; display: flex; flex-direction: column; gap: var(--spacing-3); max-width: calc(100vw - 32px); pointer-events: none; }
+.toasts .bm-toast { pointer-events: auto; animation: toast-in .2s ease-out; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* ---------- side panel ---------- */
+.side-card { flex: none; display: flex; flex-direction: column; background: var(--white-bg); border-radius: var(--radius-md); box-shadow: var(--elevation-sm); }
+.side-card__tabs { padding: var(--spacing-3) var(--spacing-5) 0; border-bottom: 1px solid var(--field-border); overflow-x: auto; }
+.side-card__tabs { scrollbar-width: none; }
+.side-card__tabs::-webkit-scrollbar { display: none; }
+.side-card__tabs .bm-tabs { gap: var(--spacing-5); }
+@media (max-width: 1439px) { .side-card__tabs .bm-tabs { gap: var(--spacing-4); } .side-card__tabs .bm-tab { font: var(--text-Web-Heading-5); } }
+.side-card__tabs .bm-tab { white-space: nowrap; }
+.side-card__body { padding: var(--spacing-4) var(--spacing-5); }
+.side-card__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-3); padding: var(--spacing-3) var(--spacing-5);
+  background: var(--body-bg); border-radius: 0 0 var(--radius-md) var(--radius-md); }
+.side-fields { display: flex; flex-direction: column; gap: var(--spacing-2); }
+.side-fields .bm-field--inline .bm-field__col { flex: 0 1 220px; width: auto; min-width: 0; }
+.side-fields .bm-field__label { font: var(--text-Web-Body-2); }
+.date-field .bm-field__input { cursor: pointer; }
+.date-field .is-disabled .bm-field__input { cursor: default; }
+.date-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; }
+.price-sum { display: flex; flex-direction: column; gap: var(--spacing-2); margin: var(--spacing-3) 0 0; padding-top: var(--spacing-3); border-top: 1px solid var(--section-divider); }
+.price-sum div { display: flex; justify-content: space-between; gap: var(--spacing-3); }
+.price-sum dt { font: var(--text-Web-Subtitle-2); color: var(--heading-text); }
+.price-sum dd { margin: 0; font: var(--text-Web-Subtitle-2); color: var(--content-text); font-variant-numeric: tabular-nums; }
+.subtabs { display: flex; align-items: center; gap: var(--spacing-1); margin-bottom: var(--spacing-2); }
+.subtabs__track { flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.subtabs__track::-webkit-scrollbar { display: none; }
+.subtabs__arrow { flex: none; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-xs); background: var(--body-bg); color: var(--neutral-500); cursor: pointer; }
+.tabs-sm.bm-tabs { gap: var(--spacing-4); }
+.tabs-sm .bm-tab { padding-bottom: var(--spacing-2); font: var(--text-Web-Subtitle-2); white-space: nowrap; }
+.tabs-sm .bm-tab::after { height: 2px; }
+.acts { list-style: none; margin: 0; padding: 0; }
+.act { position: relative; display: flex; align-items: center; gap: var(--spacing-2); min-height: 40px; border-bottom: 1px solid var(--section-divider); font: var(--text-Web-Caption-1); color: var(--content-text); }
+.act:focus-visible { outline: 2px solid var(--info); outline-offset: -2px; }
+.act__time, .act__by, .act__type { flex: none; white-space: nowrap; }
+.act__by { color: var(--label-text); }
+.act__text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.act__sep { flex: none; width: 1px; height: 14px; background: var(--section-divider); }
+.act__tip { position: absolute; left: 50%; bottom: calc(100% + 4px); z-index: 20; width: max-content; max-width: 320px; transform: translateX(-50%); pointer-events: none; }
+.add-btn.bm-btn { border-radius: var(--radius-round); background: var(--white-bg); box-shadow: var(--elevation-sm); color: var(--secondary); }
+.add-btn.bm-btn:hover { background: var(--pink-table-bg); }
+
+/* ---------- responsive ---------- */
+@media (max-width: 1639px) {
+  .jh__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jh__contact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jh-contact.bm-btn { position: static; transform: none; }
+  .toolbar { padding-top: var(--spacing-4); }
+}
+@media (min-width: 1200px) {
+  .work { grid-template-columns: minmax(0, 1fr) var(--side-w); }
+  .side { display: flex; flex-direction: column; align-items: stretch; }
+}
+/* Large screens (the Figma frame is 1920 x 1080): fixed-height workspace; the table and side panel scroll on their own. */
+@media (min-width: 1640px) and (min-height: 900px) {
+  .app { height: 100%; min-height: 0; }
+  .work { flex: 1 1 auto; min-height: 0; align-items: stretch; }
+  .pt--page .pt-scroll { max-height: none; }
+  .side { min-height: 0; overflow: auto; padding-top: 7px; }
+  .page-foot { position: static; }
+}
+@media (max-width: 720px) {
+  .work, .page-foot, .bm-gnav__bar, .bm-gnav__page { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .bm-gnav__bar { gap: var(--spacing-4); }
+  .bm-gnav__items { display: none; }
+  .bm-gnav__brand { margin-right: auto; padding-right: 0; border-right: 0; }
+  .bm-gnav__user > span:not(.bm-avatar), .bm-gnav__user .bm-chevron { display: none; }
+  .jh { padding: var(--spacing-3) var(--spacing-4); }
+  .jh__grid, .jh__contact { grid-template-columns: minmax(0, 1fr); }
+  .job-card__table { padding: 0 var(--spacing-3); }
+  .toolbar { padding: var(--spacing-4) var(--spacing-3); }
+  .toolbar__group { gap: var(--spacing-3); }
+  .side-fields .bm-field--inline { flex-direction: column; gap: var(--spacing-1); }
+  .side-fields .bm-field--inline .bm-field__label { padding-top: 0; }
+  .side-fields .bm-field--inline .bm-field__col { flex: none; width: 100%; }
+  .pm { flex-direction: column; }
+  .pm--up { flex-direction: column-reverse; }
+  .pm-pop, .pm-pop--sub { width: min(337px, calc(100vw - 48px)); }
+  .jp.bm-modal { top: 16px; bottom: 16px; left: 16px; right: 16px; }
+  .scrim--modal { top: 0; }
+  .opt-body { padding: var(--spacing-3); }
+}
+@media (max-width: 480px) {
+  .bm-gnav__tools > .bm-icon:nth-of-type(1), .bm-gnav__tools > .bm-icon:nth-of-type(4) { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toasts .bm-toast, .pt-item.is-new > .pt-row { animation: none; }
+  .jh-contact__icon, .hdr-btn__arrow { transition: none; }
+}
+</style>
+
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/htm@3.1.1/dist/htm.umd.js"></script>
+<script src="ds/bundle.js"></script>
+<script>
+(function () {
+  'use strict';
+  const { useState, useEffect, useRef, useCallback, useLayoutEffect, Fragment } = React;
+  const html = htm.bind(React.createElement);
+  const { Button, Checkbox, Switch, FieldInput, OptionList, DatePicker, Tabs, GlobalNav, Toast, Tooltip, EmptyState, Icon, Modal } = window.BlindMatrix;
+
+  /* ===================== helpers ===================== */
+  const clone = (x) => JSON.parse(JSON.stringify(x));
+  const money = (n) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const sr = (t) => html`<span className="bm-sr">${t}</span>`;
+  /* Scroll a product row into view inside its own table scroller only (scrollIntoView would also scroll the modal). */
+  const scrollToRow = (id) => {
+    const el = document.getElementById(id); const sc = el && el.closest('.pt-scroll'); if (!sc) return;
+    sc.scrollTo({ top: sc.scrollTop + el.getBoundingClientRect().top - sc.getBoundingClientRect().top - 104, behavior: 'smooth' });
+  };
+
+  /* Escape closes the top-most open layer only. */
+  const escStack = [];
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && escStack.length) { e.preventDefault(); escStack[escStack.length - 1].current(); }
+  });
+  function useEscape(cb, active = true) {
+    const ref = useRef(cb); ref.current = cb;
+    useEffect(() => {
+      if (!active) return undefined;
+      escStack.push(ref);
+      return () => { const i = escStack.lastIndexOf(ref); if (i >= 0) escStack.splice(i, 1); };
+    }, [active]);
+  }
+  function useOutside(ref, cb, active) {
+    const fn = useRef(cb); fn.current = cb;
+    useEffect(() => {
+      if (!active) return undefined;
+      const h = (e) => { if (ref.current && !ref.current.contains(e.target)) fn.current(); };
+      document.addEventListener('mousedown', h);
+      return () => document.removeEventListener('mousedown', h);
+    }, [active]);
+  }
+  /* DS OptionList items are click-only; make them reachable and operable from the keyboard. */
+  function useOptionKeys(ref) {
+    useEffect(() => { if (ref.current) ref.current.querySelectorAll('[role="option"]').forEach((el) => { el.tabIndex = 0; }); });
+    return (e) => {
+      const opt = e.target.closest && e.target.closest('[role="option"]');
+      if (opt && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); opt.click(); return; }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const opts = Array.from(ref.current.querySelectorAll('[role="option"]'));
+        const i = opts.indexOf(document.activeElement);
+        const next = opts[(i + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length];
+        if (next) { e.preventDefault(); next.focus(); }
+      }
+    };
+  }
+  function Popover({ className, children }) {
+    const ref = useRef(null);
+    const onKeyDown = useOptionKeys(ref);
+    return html`<div className=${className} ref=${ref} onKeyDown=${onKeyDown}>${children}</div>`;
+  }
+  /* Menus inside scrolling tables are placed with fixed positioning so the scroll area never clips them. */
+  function AnchoredMenu({ anchorRef, width = 224, onClose, children }) {
+    const ref = useRef(null);
+    const [style, setStyle] = useState({ visibility: 'hidden', top: 0, left: 0, width });
+    const onKeyDown = useOptionKeys(ref);
+    useLayoutEffect(() => {
+      const a = anchorRef.current; if (!a || !ref.current) return;
+      const r = a.getBoundingClientRect(); const h = ref.current.offsetHeight;
+      const left = Math.max(8, Math.min(r.right - width, window.innerWidth - width - 8));
+      const top = r.bottom + 6 + h > window.innerHeight - 8 ? Math.max(8, r.top - 6 - h) : r.bottom + 6;
+      setStyle({ top, left, width });
+    }, []);
+    useEffect(() => {
+      const onScroll = (e) => { if (ref.current && ref.current.contains(e.target)) return; onClose(); };
+      window.addEventListener('resize', onClose); document.addEventListener('scroll', onScroll, true);
+      return () => { window.removeEventListener('resize', onClose); document.removeEventListener('scroll', onScroll, true); };
+    }, []);
+    return html`<div className="menu-fixed" style=${style} ref=${ref} onKeyDown=${onKeyDown}>${children}</div>`;
+  }
+
+  /* Carets are drawn as simple chevrons, as the DS bundle does. */
+  function Chevron({ dir = 'down', size = 16 }) {
+    const r = { down: 0, up: 180, left: 90, right: -90 }[dir];
+    return html`<svg className="bm-chevron" width=${size} height=${size} viewBox="0 0 16 16" fill="none" aria-hidden="true" style=${{ transform: 'rotate(' + r + 'deg)' }}>
+      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>`;
+  }
+  /* vuesax icons from the Figma library that are not in the DS core Icon set */
+  const AssetIcon = ({ src, size = 24 }) => html`<img className="asset-icon" src=${src} width=${size} height=${size} alt="" />`;
+
+  /* ===================== data ===================== */
+  const NAV = ['Dashboard', 'All jobs', 'Tasks', 'Calendar', 'Production management', 'Purchase orders', 'More'];
+  const CURTAIN_TYPES = ['3 PLEATED CURTAIN', 'ROMAN BLIND', 'LEAD WEIGHT CHAIN', 'TIE BACK HOLDER', 'LACE AND TASSELS'];
+  const ITEM_TYPES = ['MAIN CLOTH', 'LINNING', 'NO LINNING'];
+  const GROUPS = {
+    'Ungroup Products': ['Romans (Darpan)', 'Одговорите На Неколико', 'Aluminium Venetian (DEC) EDI', 'Verticals (Arena) EDI Old', 'Excel Roller (DEC) EDI 2024'],
+    'Rollers': ['Excel Roller (DEC) EDI 2024'],
+    'Soft Furnishing': ['Romans (Darpan)'],
+    'Outdoor Products': [],
+    'Verts': ['Verticals (Arena) EDI Old'],
+    'Venetian': ['Aluminium Venetian (DEC) EDI'],
+    'Shutters': [],
+    'DMI': [],
+  };
+  const UNIT_OPTS = ['mm', 'cm', 'inch'];
+  const BLIND_FIELDS = [
+    { key: 'unitType', label: 'Unit Type', type: 'select', options: UNIT_OPTS, mandatory: true },
+    { key: 'quantity', label: 'Quantity', mandatory: true },
+    { key: 'location', label: 'Location' },
+    { key: 'supplier', label: 'Supplier' },
+    { key: 'measureTo', label: 'Measure to', mandatory: true },
+    { key: 'width', label: 'Width', type: 'unit', mandatory: true, min: 0, max: 500 },
+    { key: 'drop', label: 'Drop', type: 'unit', mandatory: true },
+    { key: 'extras', label: 'Extras' },
+    { key: 'fabric', label: 'Fabric' },
+    { key: 'color', label: 'Color' },
+    { key: 'cassetteType', label: 'Cassette Type' },
+    { key: 'cassetteColor', label: 'Cassette Color' },
+    { key: 'blindType', label: 'Blind type' },
+    { key: 'priceGroup', label: 'Price group', type: 'select', options: ['Select', 'Band A', 'Band B', 'Band C'] },
+    { key: 'motor', label: 'Motor', type: 'select', options: ['Select', 'Battery motor', 'Mains motor', 'No motor'] },
+    { key: 'new', label: 'New' },
+    { key: 'width2', label: 'Width2' },
+    { key: 'width3', label: 'Width3' },
+    { key: 'test', label: 'test' },
+    { key: 'newField', label: 'new field' },
+  ];
+  const CURTAIN_FIELDS = [
+    { key: 'unitType', label: 'Unit Type', type: 'select', options: UNIT_OPTS },
+    { key: 'quantity', label: 'Quantity', revealsItemType: true },
+    { key: 'location', label: 'Location' },
+    { key: 'supplier', label: 'Supplier' },
+    { key: 'room', label: 'Room' },
+    { key: 'roomType', label: 'Room Type' },
+    { key: 'width', label: 'Width', type: 'unit' },
+    { key: 'height', label: 'Height', type: 'unit' },
+    { key: 'productQuery', label: 'Product Query', type: 'select', options: ['Select', 'Measure check', 'Fabric check', 'Price check'] },
+    { key: 'barcode', label: 'Barcodeddd' },
+    { key: 'curtainType', label: 'Type of Curtain', type: 'picker' },
+    { key: 'itemType', label: 'Item Type', type: 'picker' },
+  ];
+  const FIELDS = { blind: BLIND_FIELDS, curtain: CURTAIN_FIELDS };
+  const WIDTH_DEF = BLIND_FIELDS.find((d) => d.key === 'width');
+  const BASE_PRICE = { itemPrice: 280, netPrice: 296, vat: 34.6, gross: 332.6 };
+  const DESC = 'Arena, 400, 7000, Bottom Bar, Left Test';
+  const COLS = [
+    { key: 'name', label: 'Product', w: 'minmax(130px, 161fr)' },
+    { key: 'desc', label: 'Description', w: 'minmax(200px, 341fr)' },
+    { key: 'qty', label: 'Qty', w: 'minmax(72px, 122fr)' },
+    { key: 'itemPrice', label: 'Item price', w: 'minmax(108px, 147fr)', money: true },
+    { key: 'netPrice', label: 'Net price', w: 'minmax(108px, 145fr)', money: true },
+    { key: 'vat', label: 'VAT', w: 'minmax(96px, 128fr)', money: true },
+    { key: 'gross', label: 'Gross price', w: 'minmax(116px, 145fr)', money: true },
+    { key: 'status', label: 'Product status', w: 'minmax(140px, 153fr)', modal: true },
+    { key: 'seq', label: 'Seq', w: 'minmax(72px, 107fr)', modal: true },
+    { key: 'ready', label: 'Status', w: 'minmax(104px, 107fr)', modal: true, noFilter: true },
+  ];
+  const minOf = (w) => parseInt(/minmax\((\d+)px/.exec(w)[1], 10);
+  const SEED_ACTIVITY = [
+    { id: 'a1', time: 'May 15, 3:25 PM', by: 'Joans', type: 'Notes', text: 'I would like to inform your fitter about the parking restrictions outside the property. Please call 30 minutes before arriving.' },
+    { id: 'a2', time: 'May 15, 3:25 PM', by: 'Joans', type: 'Notes', text: 'I would like to inform your fitter that the bedroom window has a deep recess, so longer brackets are needed.' },
+    { id: 'a3', time: 'May 14, 11:02 AM', by: 'Vivek Rao', type: 'SMS', text: 'Fitting appointment confirmed for 03-09-2024 at 09:00AM.' },
+    { id: 'a4', time: 'May 12, 4:40 PM', by: 'Vivek Rao', type: 'Email', text: 'Quote BM0024 sent to Joe Smith.' },
+    { id: 'a5', time: 'May 10, 9:15 AM', by: 'Production', type: 'Production notes', text: 'Zebra blinds fabric reserved. Production starts when the deposit is received.' },
+  ];
+
+  let seq = 0;
+  const nextId = () => 'p' + (++seq);
+  function zebra(width) {
+    return { id: nextId(), kind: 'blind', name: 'Zebra blinds', desc: DESC, status: '-', ready: false, expanded: true, checked: false,
+      f: { unitType: 'mm', quantity: '1', location: 'bedroom', supplier: 'Arena', measureTo: 'Blind Size', width, drop: '700', extras: 'Bottom Bar',
+        fabric: '38mm Expressions Faux wood Venetian', color: 'White', cassetteType: 'Semi cassette', cassetteColor: 'Anthracite', blindType: '',
+        priceGroup: 'Select', motor: 'Select', new: '', width2: '', width3: '', test: '', newField: '' } };
+  }
+  function newProduct(name) {
+    if (name === 'Romans (Darpan)') {
+      return { id: nextId(), kind: 'curtain', name, desc: DESC, status: '-', ready: false, expanded: true, checked: false, isNew: true, itemTypeShown: false,
+        f: { unitType: 'mm', quantity: '1', location: 'bedroom', supplier: 'Darpan', room: '', roomType: '', width: '', height: '', productQuery: 'Select', barcode: '', curtainType: '', itemType: '' } };
+    }
+    const base = zebra('');
+    return { ...base, name, desc: '-', isNew: true,
+      f: { ...base.f, location: '', supplier: '', measureTo: '', drop: '', extras: '', fabric: '', color: '', cassetteType: '', cassetteColor: '' } };
+  }
+  const qtyOf = (p) => { const n = parseFloat(p.f.quantity); return isFinite(n) && n > 0 ? n : 0; };
+  const rangeError = (d, v) => d.max != null && String(v).trim() !== '' && (isNaN(Number(v)) || Number(v) < d.min || Number(v) > d.max);
+  const textOf = (p, key, i) => {
+    if (key === 'qty') return p.f.quantity;
+    if (key === 'seq') return String(i + 1);
+    if (BASE_PRICE[key] != null) return money(BASE_PRICE[key] * qtyOf(p));
+    return p[key] == null ? '' : String(p[key]);
+  };
+
+  /* ===================== fields ===================== */
+  const fieldCls = (layout, state) => 'bm-field bm-field--' + layout + ' bm-field--web is-' + state;
+
+  /* Select and suffix fields reuse the DS FieldInput markup and classes; FieldInput itself takes neither a <select> nor a unit suffix. */
+  function SelectField({ id, label, value, options, onChange, mandatory, layout = 'stacked', ariaLabel }) {
+    return html`<div className=${fieldCls(layout, 'default')} style=${{ width: '100%' }}>
+      ${label && html`<label className="bm-field__label" htmlFor=${id}>${label}${mandatory && sr(' (required)')}</label>`}
+      <div className="bm-field__col">
+        <div className=${'bm-field__box sel-box' + (mandatory ? ' is-mandatory' : '')}>
+          <select id=${id} className="bm-field__input" value=${value} aria-label=${ariaLabel} onChange=${(e) => onChange(e.target.value)}>
+            ${options.map((o) => html`<option key=${o} value=${o}>${o}</option>`)}
+          </select>
+          <${Chevron} />
+        </div>
+      </div>
+    </div>`;
+  }
+  function UnitField({ id, label, value, onChange, mandatory, error, caption, unit }) {
+    const capId = id + '-cap';
+    return html`<div className=${fieldCls('stacked', error ? 'error' : 'default')} style=${{ width: '100%' }}>
+      <label className="bm-field__label" htmlFor=${id}>${label}${mandatory && sr(' (required)')}</label>
+      <div className="bm-field__col">
+        <div className=${'bm-field__box' + (mandatory ? ' is-mandatory' : '')}>
+          <input id=${id} className="bm-field__input" inputMode="decimal" value=${value} onChange=${(e) => onChange(e.target.value)}
+            aria-invalid=${error || undefined} aria-describedby=${caption ? capId : undefined} />
+          <span className="field-unit">${unit}</span>
+        </div>
+        ${caption && html`<div className="bm-field__caption" id=${capId}>${caption}</div>`}
+      </div>
+    </div>`;
+  }
+  function PickerField({ id, label, value, onOpen }) {
+    return html`<div className=${fieldCls('stacked', 'default')} style=${{ width: '100%' }}>
+      <label className="bm-field__label" htmlFor=${id}>${label}</label>
+      <div className="bm-field__col">
+        <button id=${id} type="button" className="bm-field__box picker-box" aria-haspopup="dialog" onClick=${onOpen}>
+          <span className="bm-field__input picker-box__value">${value || 'Select'}</span>
+          <${Chevron} />
+        </button>
+      </div>
+    </div>`;
+  }
+
+  /* ===================== add product menu ===================== */
+  function ProductPicker({ dir, align, onPick }) {
+    const [q, setQ] = useState('');
+    const [group, setGroup] = useState(null);
+    const [pq, setPq] = useState('');
+    const groups = Object.keys(GROUPS).filter((g) => g.toLowerCase().includes(q.trim().toLowerCase()));
+    const prods = group ? GROUPS[group].filter((n) => n.toLowerCase().includes(pq.trim().toLowerCase())) : [];
+    return html`<div className=${'pm pm--' + dir + (align === 'end' ? ' pm--end' : '')}>
+      <${Popover} className="pm-pop">
+        <div className="pm-search">
+          <${FieldInput} id=${'pm-groups-' + dir} placeholder="Search groupname" aria-label="Search groupname" icon="search-normal" width="100%" autoFocus
+            value=${q} onChange=${(e) => setQ(e.target.value)} />
+        </div>
+        ${groups.length
+          ? html`<${OptionList} className="pm-list pm-list--groups" items=${groups} selected=${group} onSelect=${(g) => { setGroup(g); setPq(''); }} />`
+          : html`<${EmptyState} className="pm-emptystate" title="No data available" />`}
+      <//>
+      ${group && html`<${Popover} className="pm-pop pm-pop--sub">
+        <div className="pm-search">
+          <${FieldInput} id=${'pm-products-' + dir} placeholder="Search product" aria-label=${'Search ' + group} icon="search-normal" width="100%"
+            value=${pq} onChange=${(e) => setPq(e.target.value)} />
+        </div>
+        ${prods.length
+          ? html`<${OptionList} className="pm-list" items=${prods} onSelect=${onPick} />`
+          : html`<${EmptyState} className="pm-emptystate" title="No data available" />`}
+      <//>`}
+    </div>`;
+  }
+
+  function MenuButton({ label, items, onSelect, align = 'left', icon, ariaLabel }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+    useOutside(ref, () => setOpen(false), open);
+    useEscape(() => setOpen(false), open);
+    const iconOnly = !label;
+    return html`<div className="menu-anchor" ref=${ref}>
+      <${Button} variant="secondary-outlined" iconOnly=${iconOnly} icon=${icon} label=${ariaLabel} aria-haspopup="listbox" aria-expanded=${open}
+        rightIcon=${iconOnly ? undefined : html`<${Chevron} dir=${open ? 'up' : 'down'} size=${20} />`} onClick=${() => setOpen((v) => !v)}>${label}<//>
+      ${open && html`<${Popover} className=${'menu-pop menu-pop--' + align}>
+        <${OptionList} items=${items} width=${232} onSelect=${(v) => { setOpen(false); onSelect(v); }} />
+      <//>`}
+    </div>`;
+  }
+
+  /* ===================== option tables (Type of Curtain, Item Type) ===================== */
+  function OptionsPicker({ label, options, value, onSelect, onCancel }) {
+    const ref = useRef(null);
+    useEscape(onCancel);
+    useEffect(() => {
+      const el = ref.current && (ref.current.querySelector('tbody tr.is-selected') || ref.current.querySelector('tbody tr'));
+      if (el) el.focus();
+    }, []);
+    return html`<div className="scrim scrim--top" onMouseDown=${(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+      <div className="bm-modal opt-modal" role="dialog" aria-modal="true" aria-label=${label} ref=${ref}>
+        <div className="opt-body">
+          <div className="bm-table opt-table">
+            <table>
+              <thead><tr>
+                <th className="opt-qty">Qty</th><th>Option Name</th><th>Option Code</th>
+                <th className="bm-table__more"><span className="hdr-btn hdr-btn--static" aria-hidden="true"><${AssetIcon} src="assets/setting-4.svg" size=${20} /></span></th>
+              </tr></thead>
+              <tbody>
+                ${options.map((o) => html`<tr key=${o} tabIndex="0" className=${o === value ? 'is-selected' : undefined} aria-selected=${o === value}
+                  onClick=${() => onSelect(o)} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(o); } }}>
+                  <td>1</td><td>${o}</td><td></td><td></td>
+                </tr>`)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="bm-modal__foot opt-foot"><${Button} variant="neutral" onClick=${onCancel}>Cancel<//></div>
+      </div>
+    </div>`;
+  }
+  function useOptionsPicker(setItems) {
+    const [req, setReq] = useState(null);
+    const open = useCallback((id, key, value, fieldId) => setReq({ id, key, value, fieldId }), []);
+    const close = () => { const fid = req && req.fieldId; setReq(null); setTimeout(() => { const el = fid && document.getElementById(fid); if (el) el.focus(); }, 0); };
+    const el = req && html`<${OptionsPicker}
+      label=${req.key === 'curtainType' ? 'Type of Curtain' : 'Item Type'}
+      options=${req.key === 'curtainType' ? CURTAIN_TYPES : ITEM_TYPES}
+      value=${req.value}
+      onCancel=${close}
+      onSelect=${(v) => { setItems((l) => l.map((p) => (p.id === req.id ? { ...p, itemTypeShown: true, f: { ...p.f, [req.key]: v } } : p))); close(); }} />`;
+    return [el, open];
+  }
+
+  /* ===================== product table ===================== */
+  function ProductTable({ mode, items, setItems, onRowSave, onRowCancel, onOpenOptions, toast }) {
+    const [filters, setFilters] = useState({});
+    const [editingFilter, setEditingFilter] = useState(null);
+    const [hidden, setHidden] = useState([]);
+    const [menu, setMenu] = useState(null);
+    const [dragId, setDragId] = useState(null);
+    const [overId, setOverId] = useState(null);
+    const [confirmDel, setConfirmDel] = useState(null);
+    const [paneW, setPaneW] = useState(0);
+    const menuRef = useRef(null);
+    const scrollRef = useRef(null);
+    useEffect(() => {
+      const el = scrollRef.current;
+      if (!el || !window.ResizeObserver) return undefined;
+      const ro = new ResizeObserver(() => setPaneW(el.clientWidth));
+      ro.observe(el); setPaneW(el.clientWidth);
+      return () => ro.disconnect();
+    }, []);
+    const paneStyle = paneW ? { width: paneW + 'px' } : undefined;
+    useOutside(menuRef, () => setMenu(null), !!menu);
+    useEscape(() => setMenu(null), !!menu);
+    useEscape(() => setConfirmDel(null), !!confirmDel);
+
+    const allCols = COLS.filter((c) => mode === 'modal' || !c.modal);
+    const cols = allCols.filter((c) => !hidden.includes(c.key));
+    const tpl = '48px 48px ' + cols.map((c) => c.w).join(' ') + ' 48px 45px';
+    const minW = 48 + 48 + cols.reduce((s, c) => s + minOf(c.w), 0) + 93;
+
+    const update = (id, fn) => setItems((l) => l.map((p) => (p.id === id ? fn(p) : p)));
+    const visible = items.filter((p, i) => Object.keys(filters).every((k) => !filters[k] || textOf(p, k, i).toLowerCase().includes(filters[k].trim().toLowerCase())));
+    const allChecked = items.length > 0 && items.every((p) => p.checked);
+    const someChecked = items.some((p) => p.checked);
+    const anyExpanded = items.some((p) => p.expanded);
+
+    const reorder = (from, to) => {
+      if (!from || from === to) return;
+      setItems((l) => {
+        const a = l.slice(); const fi = a.findIndex((x) => x.id === from); const ti0 = a.findIndex((x) => x.id === to);
+        const [m] = a.splice(fi, 1); const ti = a.findIndex((x) => x.id === to);
+        a.splice(fi < ti0 ? ti + 1 : ti, 0, m); return a;
+      });
+    };
+    const rowAction = (action, p) => {
+      setMenu(null);
+      if (action === 'Copy product') {
+        setItems((l) => { const i = l.findIndex((x) => x.id === p.id); const n = l.slice(); n.splice(i + 1, 0, { ...clone(p), id: nextId(), checked: false, isNew: true }); return n; });
+        toast('success', p.name + ' copied successfully.');
+      } else {
+        setConfirmDel(p);
+      }
+    };
+
+    const renderField = (p, d) => {
+      const id = mode + '-' + p.id + '-' + d.key;
+      const v = p.f[d.key] == null ? '' : p.f[d.key];
+      const set = (val) => update(p.id, (x) => ({ ...x, itemTypeShown: x.itemTypeShown || !!d.revealsItemType, f: { ...x.f, [d.key]: val } }));
+      if (d.key === 'itemType' && !p.itemTypeShown) return null;
+      if (d.type === 'select') return html`<${SelectField} key=${d.key} id=${id} label=${d.label} value=${v} options=${d.options} mandatory=${d.mandatory} onChange=${set} />`;
+      if (d.type === 'unit') {
+        const err = rangeError(d, v);
+        return html`<${UnitField} key=${d.key} id=${id} label=${d.label} value=${v} unit=${p.f.unitType || 'mm'} mandatory=${d.mandatory} error=${err}
+          caption=${err ? '(Min ' + d.min + ' - Max ' + d.max + ')' : null} onChange=${set} />`;
+      }
+      if (d.type === 'picker') return html`<${PickerField} key=${d.key} id=${id} label=${d.label} value=${v} onOpen=${() => onOpenOptions(p.id, d.key, v, id)} />`;
+      const reveal = d.revealsItemType ? () => { if (!p.itemTypeShown) update(p.id, (x) => ({ ...x, itemTypeShown: true })); } : undefined;
+      return html`<${FieldInput} key=${d.key} id=${id} label=${d.label} value=${v} mandatory=${!!d.mandatory} width="100%"
+        onChange=${(e) => set(e.target.value)} onFocus=${reveal} onClick=${reveal} />`;
+    };
+
+    const cell = (p, c, i) => {
+      if (c.key === 'name') return p.name;
+      if (c.key === 'desc') return p.desc;
+      if (c.key === 'qty') return p.f.quantity || '0';
+      if (c.key === 'status') return p.status;
+      if (c.key === 'seq') return i + 1;
+      if (c.key === 'ready') return html`<${Switch} text="Ready" checked=${p.ready} aria-label=${'Ready, ' + p.name} onChange=${() => update(p.id, (x) => ({ ...x, ready: !x.ready }))} />`;
+      return money(BASE_PRICE[c.key] * qtyOf(p));
+    };
+
+    const head = html`<div className="pt-head" style=${{ gridTemplateColumns: tpl }}>
+      <div className="pt-c pt-c--center">
+        <${Checkbox} checked=${allChecked} indeterminate=${someChecked && !allChecked} label=${sr('Select all products')}
+          onChange=${() => setItems((l) => l.map((p) => ({ ...p, checked: !allChecked })))} />
+      </div>
+      <div className="pt-c pt-c--center">
+        <button type="button" className="hdr-btn" aria-label=${anyExpanded ? 'Collapse all products' : 'Expand all products'} title=${anyExpanded ? 'Collapse all' : 'Expand all'}
+          onClick=${() => setItems((l) => l.map((p) => ({ ...p, expanded: !anyExpanded })))}>
+          <span className=${'hdr-btn__arrow' + (anyExpanded ? '' : ' is-down')}><${Icon} name="arrow-left" size=${18} /></span>
+        </button>
+      </div>
+      ${cols.map((c) => html`<div key=${c.key} className="pt-c">${c.label}</div>`)}
+      <div className="pt-c pt-c--end" style=${{ gridColumn: 'span 2' }} ref=${menu === 'cols' ? menuRef : null}>
+        <button type="button" className="hdr-btn" aria-label="Show or hide columns" title="Columns" aria-expanded=${menu === 'cols'}
+          onClick=${() => setMenu(menu === 'cols' ? null : 'cols')}><${AssetIcon} src="assets/setting-4.svg" size=${20} /></button>
+        ${menu === 'cols' && html`<${AnchoredMenu} anchorRef=${menuRef} width=${232} onClose=${() => setMenu(null)}>
+          <${OptionList} multiple width=${232} items=${allCols.map((c) => ({ label: c.label, value: c.key }))}
+            selected=${allCols.filter((c) => !hidden.includes(c.key)).map((c) => c.key)}
+            onSelect=${(k) => setHidden((h) => (h.includes(k) ? h.filter((x) => x !== k) : (allCols.length - h.length > 1 ? h.concat(k) : h)))} />
+        <//>`}
+      </div>
+    </div>`;
+
+    const filterRow = html`<div className="pt-filter" style=${{ gridTemplateColumns: tpl }}>
+      <div /><div />
+      ${cols.map((c) => html`<div key=${c.key} className="pt-c">${c.noFilter ? null
+        : (editingFilter === c.key || filters[c.key])
+          ? html`<input className="pt-search" id=${mode + '-filter-' + c.key} placeholder="Search" aria-label=${'Search ' + c.label} autoFocus=${editingFilter === c.key}
+              value=${filters[c.key] || ''} onChange=${(e) => setFilters((f) => ({ ...f, [c.key]: e.target.value }))} onBlur=${() => setEditingFilter(null)}
+              onKeyDown=${(e) => { if (e.key === 'Escape') { e.stopPropagation(); setFilters((f) => ({ ...f, [c.key]: '' })); setEditingFilter(null); } }} />`
+          : html`<button type="button" className="pt-searchbtn" aria-label=${'Search ' + c.label} onClick=${() => setEditingFilter(c.key)}><${Icon} name="search-normal" size=${14} /></button>`}
+      </div>`)}
+      <div /><div />
+    </div>`;
+
+    const rows = visible.map((p) => {
+      const i = items.indexOf(p);
+      const priceErr = p.kind === 'blind' && rangeError(WIDTH_DEF, p.f.width);
+      const cls = 'pt-item' + (p.isNew ? ' is-new' : '') + (dragId === p.id ? ' is-dragging' : '') + (dragId && overId === p.id && dragId !== p.id ? ' is-drop' : '');
+      return html`<div key=${p.id} id=${mode + '-row-' + p.id} className=${cls}
+          onDragOver=${(e) => { if (dragId) { e.preventDefault(); if (overId !== p.id) setOverId(p.id); } }}
+          onDrop=${(e) => { e.preventDefault(); reorder(dragId, p.id); setDragId(null); setOverId(null); }}>
+        <div className=${'pt-row' + (p.checked ? ' is-selected' : '')} style=${{ gridTemplateColumns: tpl }}>
+          <div className="pt-c pt-c--center">
+            <${Checkbox} checked=${!!p.checked} label=${sr('Select ' + p.name + ', row ' + (i + 1))} onChange=${() => update(p.id, (x) => ({ ...x, checked: !x.checked }))} />
+          </div>
+          <div className="pt-c pt-c--center">
+            <${Button} variant="text" iconOnly label=${(p.expanded ? 'Collapse ' : 'Expand ') + p.name} aria-expanded=${!!p.expanded}
+              icon=${html`<${Chevron} dir=${p.expanded ? 'up' : 'down'} size=${20} />`} onClick=${() => update(p.id, (x) => ({ ...x, expanded: !x.expanded }))} />
+          </div>
+          ${cols.map((c) => html`<div key=${c.key} className=${'pt-c' + (c.money ? ' is-money' : '')} title=${c.key === 'desc' ? p.desc : undefined}>${cell(p, c, i)}</div>`)}
+          <div className="pt-c pt-c--center" ref=${menu === p.id ? menuRef : null}>
+            <${Button} variant="text" iconOnly label=${'More actions for ' + p.name} aria-haspopup="listbox" aria-expanded=${menu === p.id}
+              icon=${html`<span className="rot90"><${Icon} name="more" size=${20} /></span>`} onClick=${() => setMenu(menu === p.id ? null : p.id)} />
+            ${menu === p.id && html`<${AnchoredMenu} anchorRef=${menuRef} width=${184} onClose=${() => setMenu(null)}>
+              <${OptionList} width=${184} items=${['Copy product', 'Delete product']} onSelect=${(a) => rowAction(a, p)} />
+            <//>`}
+          </div>
+          <div className="pt-c pt-c--center">
+            <span className="pt-grip" draggable="true" title="Drag to reorder"
+              onDragStart=${(e) => { setDragId(p.id); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', p.id); } catch (err) { /* ignore */ } }}
+              onDragEnd=${() => { setDragId(null); setOverId(null); }}><${AssetIcon} src="assets/drag-indicator.svg" size=${21} /></span>
+          </div>
+        </div>
+        ${p.expanded && html`<div className="pf" style=${paneStyle}>
+          <div className="pf-panel">
+            <div className="pf-grid">${FIELDS[p.kind].map((d) => renderField(p, d))}</div>
+            <div className="pf-media">
+              <span className="pf-thumb" title="5 product images">
+                <span className="pf-thumb__back pf-thumb__back--a" /><span className="pf-thumb__back pf-thumb__back--b" />
+                <img className="pf-thumb__img" src="assets/product-photo.png" alt="Product photo, 5 images" />
+                <span className="pf-thumb__count" aria-hidden="true">+4</span>
+              </span>
+              <img className="pf-qr" src="assets/qr-code.png" width="46" height="46" alt="Product QR code" />
+            </div>
+          </div>
+          ${priceErr && html`<div className="pf-error"><${Icon} name="danger" size=${16} />No range available for Selected Price group</div>`}
+          ${mode === 'page' && html`<div className="pf-actions">
+            <${Button} className="bm-btn--success" onClick=${() => onRowSave(p.id)}>Save<//>
+            <${Button} variant="neutral" onClick=${() => onRowCancel(p.id)}>Cancel<//>
+          </div>`}
+        </div>`}
+      </div>`;
+    });
+
+    const sum = (key) => items.reduce((s, p) => s + BASE_PRICE[key] * qtyOf(p), 0);
+    const totalRow = html`<div className="pt-total" style=${{ gridTemplateColumns: tpl }}>
+      <div className="pt-total__label">Total</div>
+      ${cols.map((c) => html`<div key=${c.key} className="pt-c">${c.key === 'qty'
+        ? html`<span className="total-box">${items.reduce((s, p) => s + qtyOf(p), 0)}</span>`
+        : c.money ? html`<span className="total-box">${money(sum(c.key))}</span>` : null}</div>`)}
+      <div /><div />
+    </div>`;
+
+    return html`<div className=${'pt pt--' + mode}>
+      <div className="pt-scroll" ref=${scrollRef}>
+        <div className="pt-inner" style=${{ minWidth: minW + 'px' }}>
+          ${head}
+          ${filterRow}
+          <div className="pt-body">
+            ${rows.length ? rows : html`<div className="pt-empty" style=${paneStyle}><${EmptyState} title="No data available"
+              description=${items.length ? 'No products match the search.' : 'Add a product to this job.'} /></div>`}
+          </div>
+          ${mode === 'page' && totalRow}
+        </div>
+      </div>
+      ${confirmDel && html`<div className="scrim scrim--top" onMouseDown=${(e) => { if (e.target === e.currentTarget) setConfirmDel(null); }}>
+        <${Modal} title="Delete product" confirmLabel="Yes, delete" width=${480} onClose=${() => setConfirmDel(null)}
+          onConfirm=${() => { const p = confirmDel; setItems((l) => l.filter((x) => x.id !== p.id)); setConfirmDel(null); toast('success', p.name + ' deleted successfully.'); }}>
+          Delete ${confirmDel.name} from this job? Its measurements and options are removed too.
+        <//>
+      </div>`}
+    </div>`;
+  }
+
+  /* ===================== Job Products modal (bulk edit) ===================== */
+  function JobProductsModal({ initial, onSave, onClose, toast }) {
+    const [draft, setDraft] = useState(() => clone(initial).map((p) => ({ ...p, expanded: true, isNew: false })));
+    const [picker, setPicker] = useState(false);
+    const [lastAdded, setLastAdded] = useState(null);
+    const pickRef = useRef(null);
+    const dialogRef = useRef(null);
+    const [optEl, openOptions] = useOptionsPicker(setDraft);
+    useOutside(pickRef, () => setPicker(false), picker);
+    useEscape(onClose);
+    useEscape(() => setPicker(false), picker);
+    useEffect(() => { if (dialogRef.current) dialogRef.current.focus(); }, []);
+    useEffect(() => {
+      if (lastAdded) scrollToRow('modal-row-' + lastAdded);
+    }, [lastAdded]);
+    const add = (name) => { const p = newProduct(name); setDraft((d) => d.concat(p)); setPicker(false); setLastAdded(p.id); };
+    return html`<div className="scrim scrim--modal">
+      <div className="bm-modal jp" role="dialog" aria-modal="true" aria-labelledby="jp-title" tabIndex="-1" ref=${dialogRef}>
+        <div className="bm-modal__head">
+          <h2 className="bm-modal__title" id="jp-title">Job Products</h2>
+          <${Button} variant="text" iconOnly icon="close-circle" label="Close" onClick=${onClose} />
+        </div>
+        <div className="jp__body">
+          <${ProductTable} mode="modal" items=${draft} setItems=${setDraft} onOpenOptions=${openOptions} toast=${toast} />
+        </div>
+        <div className="bm-modal__foot jp__foot">
+          <div className="jp__end">
+            <div className="menu-anchor" ref=${pickRef}>
+              <${Button} variant="secondary" aria-haspopup="true" aria-expanded=${picker} rightIcon=${html`<${Chevron} dir=${picker ? 'down' : 'up'} size=${20} />`}
+                onClick=${() => setPicker((v) => !v)}>Add product<//>
+              ${picker && html`<${ProductPicker} dir="up" align="end" onPick=${add} />`}
+            </div>
+            <${Button} className="bm-btn--success" onClick=${() => onSave(draft)}>Save<//>
+            <${Button} variant="neutral" onClick=${onClose}>Cancel<//>
+          </div>
+        </div>
+      </div>
+      ${optEl}
+    </div>`;
+  }
+
+  /* ===================== job header ===================== */
+  function JobHeader() {
+    const [contact, setContact] = useState(false);
+    const [v, setV] = useState({ status: 'Lead', order: 'Under production', ver: 'Q1', account: '', invoice: '' });
+    const set = (k) => (val) => setV((s) => ({ ...s, [k]: val }));
+    const CONTACT = [['Contact name', 'Joe Smith'], ['Mobile', '98765 43210'], ['Email', 'joe@joescompany.com'], ['Site address', '12 Market Street, Springfield']];
+    return html`<div className="jh-wrap">
+      <div className="jh">
+        <div className="jh__grid">
+          <div className="jh__col">
+            <h1 className="jh__title">Joe Smith - Joe's Company</h1>
+            <${FieldInput} id="account-ref" layout="inline" label="Account Ref" width="100%" value=${v.account} onChange=${(e) => set('account')(e.target.value)} />
+          </div>
+          <div className="jh__col">
+            <${SelectField} id="job-status" layout="inline" label="Job Status:" value=${v.status} options=${['Lead', 'Quote', 'Order', 'Invoiced', 'Completed']} onChange=${set('status')} />
+            <${SelectField} id="order-status" layout="inline" label="Order Status:" value=${v.order} options=${['Under production', 'Ready for fitting', 'Fitted', 'On hold']} onChange=${set('order')} />
+          </div>
+          <div className="jh__col">
+            <div className=${fieldCls('inline', 'default')} style=${{ width: '100%' }}>
+              <label className="bm-field__label" htmlFor="job-ref">Job ref No:</label>
+              <div className="bm-field__col">
+                <div className="bm-field__box jh-ref">
+                  <input id="job-ref" className="bm-field__input" value="BM0024" readOnly />
+                  <span className="jh-ref__div" />
+                  <select className="bm-field__input jh-ref__ver" aria-label="Quote version" value=${v.ver} onChange=${(e) => set('ver')(e.target.value)}>
+                    ${['Q1', 'Q2', 'Q3'].map((q) => html`<option key=${q} value=${q}>${q}</option>`)}
+                  </select>
+                  <${Chevron} />
+                </div>
+              </div>
+            </div>
+            <${FieldInput} id="invoice-no" layout="inline" label="Invoice No:" width="100%" value=${v.invoice} onChange=${(e) => set('invoice')(e.target.value)} />
+          </div>
+        </div>
+        ${contact && html`<dl className="jh__contact" id="contact-info">
+          ${CONTACT.map(([k, val]) => html`<div key=${k}><dt>${k}</dt><dd>${val}</dd></div>`)}
+        </dl>`}
+      </div>
+      <${Button} variant="primary" className="jh-contact" aria-expanded=${contact} aria-controls="contact-info" onClick=${() => setContact((c) => !c)}
+        rightIcon=${html`<span className=${'jh-contact__icon' + (contact ? ' is-open' : '')}><${Icon} name="arrow-down" size=${12} /></span>`}>Contact Info<//>
+    </div>`;
+  }
+
+  /* ===================== side panel ===================== */
+  function SideCard({ tabs, active, onTab, foot, children }) {
+    return html`<section className="side-card">
+      <div className="side-card__tabs"><${Tabs} items=${tabs} active=${active} onChange=${onTab} /></div>
+      <div className="side-card__body">${children}</div>
+      ${foot && html`<div className="side-card__foot">${foot}</div>`}
+    </section>`;
+  }
+  const pad = (n) => String(n).padStart(2, '0');
+  function DateField({ id, label, value, onChange, disabled }) {
+    const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value || '');
+    const cur = m ? { d: +m[1], m: +m[2] - 1, y: +m[3] } : { d: null, m: 8, y: 2024 };
+    const [open, setOpen] = useState(false);
+    const [view, setView] = useState({ y: cur.y, m: cur.m });
+    const ref = useRef(null);
+    useOutside(ref, () => setOpen(false), open);
+    useEscape(() => setOpen(false), open);
+    const toggle = () => { if (disabled) return; setView({ y: cur.y, m: cur.m }); setOpen((o) => !o); };
+    return html`<div className="date-field menu-anchor" ref=${ref}>
+      <${FieldInput} id=${id} layout="inline" label=${label} value=${value} placeholder="dd-mm-yyyy" icon="calendar" width="100%" readOnly
+        state=${disabled ? 'disabled' : open ? 'active' : 'default'} aria-haspopup="dialog" aria-expanded=${open}
+        onClick=${toggle} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') { e.preventDefault(); if (!open) toggle(); } }} />
+      ${open && html`<div className="date-pop">
+        <${DatePicker} year=${view.y} month=${view.m} selected=${view.y === cur.y && view.m === cur.m ? cur.d : null}
+          onPrev=${() => setView(({ y, m: mo }) => (mo === 0 ? { y: y - 1, m: 11 } : { y, m: mo - 1 }))}
+          onNext=${() => setView(({ y, m: mo }) => (mo === 11 ? { y: y + 1, m: 0 } : { y, m: mo + 1 }))}
+          onSelect=${(d) => { onChange(pad(d) + '-' + pad(view.m + 1) + '-' + view.y); setOpen(false); }} />
+      </div>`}
+    </div>`;
+  }
+  function DatesCard() {
+    const [tab, setTab] = useState('Date');
+    const [more, setMore] = useState(false);
+    const [d, setD] = useState({ order: '03-09-2024', due: '', fitting: '' });
+    const setter = (k) => (val) => setD((s) => ({ ...s, [k]: val }));
+    const isDate = tab === 'Date';
+    return html`<${SideCard} tabs=${['Date', 'Appointment', 'Task']} active=${tab} onTab=${setTab}
+        foot=${isDate && html`<${Button} variant="secondary-outlined" aria-expanded=${more} onClick=${() => setMore((x) => !x)}>${more ? 'Show less' : 'Show more'}<//>`}>
+      ${isDate ? html`<div className="side-fields">
+          <${DateField} id="created-date" label="Created date" value="29-08-2024" disabled />
+          <${DateField} id="order-date" label="Order date" value=${d.order} onChange=${setter('order')} />
+          ${more && html`<${Fragment}>
+            <${DateField} id="due-date" label="Production due date" value=${d.due} onChange=${setter('due')} />
+            <${DateField} id="fitting-date" label="Fitting date" value=${d.fitting} onChange=${setter('fitting')} />
+          <//>`}
+        </div>`
+        : html`<${EmptyState} className="side-empty" title="No data available" />`}
+    <//>`;
+  }
+  function PriceCard() {
+    const [tab, setTab] = useState('Price details');
+    const [more, setMore] = useState(false);
+    const row = (id, label, value) => html`<${FieldInput} key=${id} id=${id} layout="inline" label=${label} value=${value} readOnly width="100%" style=${{ textAlign: 'right' }} />`;
+    const isPrice = tab === 'Price details';
+    return html`<${SideCard} tabs=${['Price details', 'Invoice & payment', 'Check list']} active=${tab} onTab=${setTab}
+        foot=${isPrice && html`<${Button} variant="secondary-outlined" aria-expanded=${more} onClick=${() => setMore((x) => !x)}>${more ? 'Show less' : 'Show more'}<//>`}>
+      ${isPrice ? html`<${Fragment}>
+          <div className="side-fields">
+            ${row('net-price', 'Net Price', '₹ 47881.19')}
+            ${row('vat-total', 'VAT', '₹ 2394.19')}
+            ${row('gross-price', 'Gross price', '₹ 21559.48')}
+            ${more && row('discount', 'Discount', '₹ 0.00')}
+            ${more && row('delivery-charge', 'Delivery charge', '₹ 0.00')}
+          </div>
+          <dl className="price-sum">
+            <div><dt>Total Paid</dt><dd>₹ 71,834.86</dd></div>
+            <div><dt>Outstanding Amount</dt><dd>₹ 00.00</dd></div>
+          </dl>
+        <//>`
+        : html`<${EmptyState} className="side-empty" title="No data available" />`}
+    <//>`;
+  }
+  const SUBS = ['History', 'Notes', 'SMS', 'Email', 'Production notes', 'Attachments'];
+  function ActivityCard({ toast }) {
+    const [tab, setTab] = useState('All activities');
+    const [sub, setSub] = useState('History');
+    const [items, setItems] = useState(SEED_ACTIVITY);
+    const [more, setMore] = useState(false);
+    const [hover, setHover] = useState(null);
+    const [adding, setAdding] = useState(false);
+    const [note, setNote] = useState('');
+    const [noteErr, setNoteErr] = useState(false);
+    const track = useRef(null);
+    useEscape(() => setAdding(false), adding);
+    const list = sub === 'History' ? items : items.filter((a) => a.type === sub);
+    const shown = more ? list : list.slice(0, 2);
+    const isAll = tab === 'All activities';
+    const closeAdd = () => { setAdding(false); setNote(''); setNoteErr(false); };
+    const saveNote = () => {
+      if (!note.trim()) { setNoteErr(true); return; }
+      const time = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      setItems((l) => [{ id: 'a' + Date.now(), time, by: 'Vivek Rao', type: 'Notes', text: note.trim() }].concat(l));
+      closeAdd(); toast('success', 'Note added successfully.');
+    };
+    const empty = sub === 'Attachments' ? 'No files yet' : 'No data available';
+    return html`<${SideCard} tabs=${['All activities', 'Terms & Conditions']} active=${tab} onTab=${setTab}
+        foot=${isAll && html`<${Fragment}>
+          ${list.length > 2 ? html`<${Button} variant="secondary-outlined" aria-expanded=${more} onClick=${() => setMore((x) => !x)}>${more ? 'Show less' : 'Show more'}<//>` : html`<span />`}
+          <${Button} variant="text" iconOnly icon="add" label="Add note" className="add-btn" onClick=${() => setAdding(true)} />
+        <//>`}>
+      ${isAll ? html`<${Fragment}>
+          <div className="subtabs">
+            <button type="button" className="subtabs__arrow" aria-label="Scroll activity types left" onClick=${() => track.current.scrollBy({ left: -120, behavior: 'smooth' })}><${Chevron} dir="left" /></button>
+            <div className="subtabs__track" ref=${track}><${Tabs} className="tabs-sm" items=${SUBS} active=${sub} onChange=${(t) => { setSub(t); setMore(false); }} /></div>
+            <button type="button" className="subtabs__arrow" aria-label="Scroll activity types right" onClick=${() => track.current.scrollBy({ left: 120, behavior: 'smooth' })}><${Chevron} dir="right" /></button>
+          </div>
+          ${shown.length ? html`<ul className="acts">
+            ${shown.map((a) => html`<li key=${a.id} className="act" tabIndex="0" aria-describedby=${hover === a.id ? 'act-tip-' + a.id : undefined}
+                onMouseEnter=${() => setHover(a.id)} onMouseLeave=${() => setHover(null)} onFocus=${() => setHover(a.id)} onBlur=${() => setHover(null)}>
+              <span className="act__time">${a.time}</span><span className="act__sep" />
+              <span className="act__by">${a.by}</span><span className="act__sep" />
+              <span className="act__text">${a.text}</span><span className="act__sep" />
+              <span className="act__type">${a.type}</span>
+              ${hover === a.id && html`<div className="act__tip" id=${'act-tip-' + a.id}><${Tooltip} title=${a.by + ' · ' + a.type} text=${a.text} arrow="bottom" /></div>`}
+            </li>`)}
+          </ul>` : html`<${EmptyState} className="side-empty" title=${empty} />`}
+        <//>`
+        : html`<${EmptyState} className="side-empty" title="No data available" />`}
+      ${adding && html`<div className="scrim scrim--top" onMouseDown=${(e) => { if (e.target === e.currentTarget) closeAdd(); }}>
+        <${Modal} title="Add note" confirmLabel="Save" width=${520} onConfirm=${saveNote} onClose=${closeAdd}>
+          <${FieldInput} id="note-text" label="Note" multiline width="100%" autoFocus value=${note} state=${noteErr ? 'error' : 'default'}
+            caption=${noteErr ? 'Enter a note before saving.' : undefined} onChange=${(e) => { setNote(e.target.value); setNoteErr(false); }} />
+        <//>
+      </div>`}
+    <//>`;
+  }
+
+  /* ===================== app ===================== */
+  function App() {
+    const [products, setProducts] = useState(() => [zebra('550'), zebra('450'), zebra('480'), zebra('500')]);
+    const [saved, setSaved] = useState(() => clone(products));
+    const [modalOpen, setModalOpen] = useState(false);
+    const [picker, setPicker] = useState(false);
+    const [toasts, setToasts] = useState([]);
+    const [lastAdded, setLastAdded] = useState(null);
+    const [reworks, setReworks] = useState(0);
+    const pickRef = useRef(null);
+    const [optEl, openOptions] = useOptionsPicker(setProducts);
+    useOutside(pickRef, () => setPicker(false), picker);
+    useEscape(() => setPicker(false), picker);
+
+    const toast = useCallback((type, msg) => {
+      const id = Date.now() + Math.random();
+      setToasts((t) => t.concat({ id, type, msg }));
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3600);
+    }, []);
+    useEffect(() => { document.body.style.overflow = modalOpen ? 'hidden' : ''; }, [modalOpen]);
+    useEffect(() => {
+      if (lastAdded) scrollToRow('page-row-' + lastAdded);
+    }, [lastAdded]);
+
+    const rowSave = (id) => {
+      const p = products.find((x) => x.id === id); if (!p) return;
+      const c = clone({ ...p, isNew: false });
+      setSaved((s) => (s.some((x) => x.id === id) ? s.map((x) => (x.id === id ? c : x)) : s.concat(c)));
+      toast('success', p.name + ' saved successfully.');
+    };
+    const rowCancel = (id) => {
+      const s = saved.find((x) => x.id === id);
+      if (s) setProducts((l) => l.map((x) => (x.id === id ? { ...clone(s), expanded: x.expanded, checked: x.checked } : x)));
+      else setProducts((l) => l.filter((x) => x.id !== id));
+    };
+    const addToPage = (name) => { const p = newProduct(name); setProducts((l) => l.concat(p)); setPicker(false); setLastAdded(p.id); };
+    const saveModal = (draft) => {
+      const clean = draft.map((p) => ({ ...p, isNew: false }));
+      setProducts(clean); setSaved(clone(clean)); setModalOpen(false);
+      toast('success', 'Job products saved successfully.');
+    };
+    const moreAction = (a) => {
+      if (a === 'Copy job') { toast('success', 'Job BM0024 copied successfully.'); return; }
+      if (reworks >= 3) { toast('error', 'Rework for a job is limited to 3 times.'); return; }
+      setReworks((n) => n + 1); toast('success', 'Rework job created successfully.');
+    };
+
+    const toolbar = html`<div className="toolbar">
+      <div className="toolbar__group">
+        <div className="menu-anchor" ref=${pickRef}>
+          <${Button} variant="secondary" aria-haspopup="true" aria-expanded=${picker} rightIcon=${html`<${Chevron} dir=${picker ? 'up' : 'down'} size=${20} />`}
+            onClick=${() => setPicker((x) => !x)}>Add product<//>
+          ${picker && html`<${ProductPicker} dir="down" onPick=${addToPage} />`}
+        </div>
+        <${MenuButton} label="Select report" items=${['Job sheet', 'Quote', 'Invoice', 'Delivery note']} onSelect=${(r) => toast('success', r + ' report generated successfully.')} />
+      </div>
+      <div className="toolbar__group">
+        <${MenuButton} label="Production" align="right" items=${['Send to production', 'Production sheet', 'Cutting list']}
+          onSelect=${(r) => toast('success', r === 'Send to production' ? 'Job sent to production successfully.' : r + ' generated successfully.')} />
+        <${MenuButton} label="Send PO" align="right" items=${['Send PO to supplier', 'Preview PO']}
+          onSelect=${(r) => toast('success', r === 'Preview PO' ? 'Purchase order preview generated successfully.' : 'Purchase order sent to Arena successfully.')} />
+        <${Button} variant="secondary-outlined" iconOnly label="Global edit" title="Global edit" icon=${html`<${AssetIcon} src="assets/global-edit.svg" />`} />
+        <${MenuButton} ariaLabel="More job actions" icon="more" align="right" items=${['Copy job', 'Create rework job']} onSelect=${moreAction} />
+        <${Button} variant="secondary-outlined" iconOnly label="Open job products" title="Open job products" icon=${html`<${AssetIcon} src="assets/maximize-4.svg" />`}
+          onClick=${() => { setPicker(false); setModalOpen(true); }} />
+      </div>
+    </div>`;
+
+    return html`<div className="app" onClickCapture=${(e) => { const a = e.target.closest && e.target.closest('a[href="#"]'); if (a) e.preventDefault(); }}>
+      <${GlobalNav} company="Lovely Blinds" items=${NAV} active="All jobs" user=${{ name: 'Vivek Rao', initials: 'VR' }} title="Edit job" />
+      <main className="work">
+        <section className="job-card" aria-label="Job details and products">
+          <${JobHeader} />
+          ${toolbar}
+          <div className="job-card__table">
+            <${ProductTable} mode="page" items=${products} setItems=${setProducts} onRowSave=${rowSave} onRowCancel=${rowCancel} onOpenOptions=${openOptions} toast=${toast} />
+          </div>
+        </section>
+        <aside className="side" aria-label="Job summary">
+          <${DatesCard} />
+          <${PriceCard} />
+          <${ActivityCard} toast=${toast} />
+        </aside>
+      </main>
+      <footer className="page-foot">
+        <${Button} variant="secondary" onClick=${() => { setSaved(clone(products.map((p) => ({ ...p, isNew: false })))); toast('success', 'Job saved successfully.'); }}>Save<//>
+        <${Button} variant="neutral" onClick=${() => setProducts(clone(saved))}>Cancel<//>
+      </footer>
+      ${modalOpen && html`<${JobProductsModal} initial=${products} onSave=${saveModal} onClose=${() => setModalOpen(false)} toast=${toast} />`}
+      ${optEl}
+      <div className="toasts" aria-live="polite">
+        ${toasts.map((t) => html`<${Toast} key=${t.id} type=${t.type}>${t.msg}<//>`)}
+      </div>
+    </div>`;
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(html`<${App} />`);
+})();
+</script>
+
+</body></html>
